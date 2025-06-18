@@ -57,7 +57,7 @@ public class JwtUtil {
         .level(claims.get("level", Integer.class))
         .treePath(claims.get("treePath", String.class))
         .headquartersId(claims.get("headquartersId", Long.class))
-        .userId(claims.get("userId", Long.class))
+        .partnerId(claims.get("partnerId", Long.class))
         .build();
   }
 

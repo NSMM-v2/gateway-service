@@ -56,22 +56,22 @@ public class JwtAuthenticationGatewayFilterFactory
           // 기존 사용자 관련 헤더 제거 (보안 - 클라이언트 조작 방지)
           ServerHttpRequest modifiedRequest = request.mutate()
               .headers(headers -> {
-                headers.remove("X-User-Id");
-                headers.remove("X-User-Type");
-                headers.remove("X-Headquarters-Id");
-                headers.remove("X-Account-Number");
-                headers.remove("X-Company-Name");
-                headers.remove("X-Level");
-                headers.remove("X-Tree-Path");
+                headers.remove("X-USER-TYPE");
+                headers.remove("X-HEADQUARTERS-ID");
+                headers.remove("X-PARTNER-ID");
+                headers.remove("X-ACCOUNT-NUMBER");
+                headers.remove("X-COMPANY-NAME");
+                headers.remove("X-LEVEL");
+                headers.remove("X-TREE-PATH");
               })
               // 검증된 사용자 정보를 헤더로 추가
-              .header("X-User-Id", String.valueOf(claims.getUserId()))
-              .header("X-User-Type", claims.getUserType())
-              .header("X-Headquarters-Id", String.valueOf(claims.getHeadquartersId()))
-              .header("X-Account-Number", claims.getAccountNumber())
-              .header("X-Company-Name", claims.getCompanyName())
-              .header("X-Level", claims.getLevel() != null ? String.valueOf(claims.getLevel()) : "")
-              .header("X-Tree-Path", claims.getTreePath() != null ? claims.getTreePath() : "")
+              .header("X-USER-TYPE", claims.getUserType())
+              .header("X-HEADQUARTERS-ID", String.valueOf(claims.getHeadquartersId()))
+              .header("X-PARTNER-ID", claims.getPartnerId() != null ? String.valueOf(claims.getPartnerId()) : "")
+              .header("X-ACCOUNT-NUMBER", claims.getAccountNumber())
+              .header("X-COMPANY-NAME", claims.getCompanyName())
+              .header("X-LEVEL", claims.getLevel() != null ? String.valueOf(claims.getLevel()) : "")
+              .header("X-TREE-PATH", claims.getTreePath() != null ? claims.getTreePath() : "")
               .build();
 
           log.debug("JWT 인증 성공 및 헤더 추가: {} ({})", claims.getAccountNumber(), claims.getUserType());
