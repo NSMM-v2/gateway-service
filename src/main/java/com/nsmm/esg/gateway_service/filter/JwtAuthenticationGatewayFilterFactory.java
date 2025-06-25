@@ -37,7 +37,8 @@ public class JwtAuthenticationGatewayFilterFactory
       ServerHttpRequest request = exchange.getRequest();
       String path = request.getURI().getPath();
 
-      log.debug("Gateway Filter 처리: {}", path);
+      log.debug("=== Gateway Filter 시작 ===");
+      log.debug("요청 경로: {}", path);
 
       // 공개 API는 JWT 검증 제외
       if (isExcludedPath(path, config.getExcludePaths())) {
@@ -47,11 +48,21 @@ public class JwtAuthenticationGatewayFilterFactory
 
       // 쿠키에서 JWT 추출
       String jwt = extractJwtFromCookie(request);
+      log.debug("추출된 JWT 토큰: {}", jwt != null ? "존재" : "없음");
 
       if (StringUtils.hasText(jwt) && jwtUtil.validateToken(jwt)) {
         try {
           // JWT 디코딩
           JwtClaims claims = jwtUtil.getAllClaimsFromToken(jwt);
+
+          log.debug("=== JWT 클레임 정보 ===");
+          log.debug("계정 번호: {}", claims.getAccountNumber());
+          log.debug("사용자 타입: {}", claims.getUserType());
+          log.debug("회사명: {}", claims.getCompanyName());
+          log.debug("본사 ID: {}", claims.getHeadquartersId());
+          log.debug("파트너 ID: {}", claims.getPartnerId());
+          log.debug("레벨: {}", claims.getLevel());
+          log.debug("트리 경로: {}", claims.getTreePath());
 
           // 기존 사용자 관련 헤더 제거 (보안 - 클라이언트 조작 방지)
           ServerHttpRequest modifiedRequest = request.mutate()
@@ -64,21 +75,41 @@ public class JwtAuthenticationGatewayFilterFactory
                 headers.remove("X-LEVEL");
                 headers.remove("X-TREE-PATH");
               })
-              // 검증된 사용자 정보를 헤더로 추가
-              .header("X-USER-TYPE", claims.getUserType())
-              .header("X-HEADQUARTERS-ID", String.valueOf(claims.getHeadquartersId()))
-              .header("X-PARTNER-ID", claims.getPartnerId() != null ? String.valueOf(claims.getPartnerId()) : "")
-              .header("X-ACCOUNT-NUMBER", claims.getAccountNumber())
-              .header("X-COMPANY-NAME", claims.getCompanyName())
-              .header("X-LEVEL", claims.getLevel() != null ? String.valueOf(claims.getLevel()) : "")
-              .header("X-TREE-PATH", claims.getTreePath() != null ? claims.getTreePath() : "")
               .build();
 
-          log.debug("JWT 인증 성공 및 헤더 추가: {} ({})", claims.getAccountNumber(), claims.getUserType());
+          // 본사와 파트너사 구분하여 처리
+          if ("HEADQUARTERS".equals(claims.getUserType())) {
+            modifiedRequest = modifiedRequest.mutate()
+                .header("X-USER-TYPE", claims.getUserType())
+                .header("X-COMPANY-NAME", claims.getCompanyName())
+                .header("X-ACCOUNT-NUMBER", claims.getAccountNumber())
+                .header("X-HEADQUARTERS-ID", String.valueOf(claims.getHeadquartersId()))
+                .header("X-TREE-PATH", "/" + claims.getAccountNumber() + "/")
+                .header("X-LEVEL", "0")
+                .build();
+          } else if ("PARTNER".equals(claims.getUserType())) {
+            modifiedRequest = modifiedRequest.mutate()
+                .header("X-USER-TYPE", claims.getUserType())
+                .header("X-COMPANY-NAME", claims.getCompanyName())
+                .header("X-ACCOUNT-NUMBER", claims.getAccountNumber())
+                .header("X-HEADQUARTERS-ID", String.valueOf(claims.getHeadquartersId()))
+                .header("X-PARTNER-ID", String.valueOf(claims.getPartnerId()))
+                .header("X-TREE-PATH", claims.getTreePath())
+                .header("X-LEVEL", String.valueOf(claims.getLevel()))
+                .build();
+          }
 
+          log.debug("=== 추가된 헤더 정보 ===");
+          modifiedRequest.getHeaders().forEach((key, value) -> {
+            log.debug("{}: {}", key, value);
+          });
+
+          log.debug("JWT 인증 성공 및 헤더 추가 완료");
           return chain.filter(exchange.mutate().request(modifiedRequest).build());
+
         } catch (Exception e) {
           log.error("JWT 처리 중 오류 발생: {}", e.getMessage());
+          log.error("상세 에러: ", e);
           return handleUnauthorized(exchange);
         }
       }
