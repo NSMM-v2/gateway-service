@@ -1,224 +1,380 @@
-# ESG Gateway Service
+# Gateway Service - Spring Cloud Gateway 기반 API Gateway
 
-> **API Gateway** - Spring Cloud Gateway 기반 중앙집중식 라우팅 및 보안 처리
+**포트폴리오 프로젝트**: ESG 플랫폼 - 마이크로서비스 중앙 라우팅 및 보안 게이트웨이
 
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.0-brightgreen.svg)](https://spring.io/projects/spring-boot)
-[![Spring Cloud](https://img.shields.io/badge/Spring%20Cloud-2025.0.0-blue.svg)](https://spring.io/projects/spring-cloud)
-[![Java](https://img.shields.io/badge/Java-17-orange.svg)](https://openjdk.java.net/)
-[![License](https://img.shields.io/badge/License-Private-red.svg)]()
+## 프로젝트 개요
 
-## 🎯 프로젝트 개요
+Gateway Service는 ESG 플랫폼의 **단일 진입점(Single Entry Point)**으로 모든 클라이언트 요청의 **중앙집중식 라우팅 및 보안 처리**를 담당하는 마이크로서비스입니다. Spring Cloud Gateway와 WebFlux 기반의 **반응형 아키텍처**로 높은 동시성과 성능을 제공합니다.
 
-ESG 프로젝트의 **핵심 인프라 컴포넌트**로, 모든 클라이언트 요청의 **단일 진입점(Single Entry Point)** 역할을 수행합니다. **반응형 프로그래밍**과 **커스텀 필터 체인**을 통해 엔터프라이즈급 보안 및 라우팅 기능을 제공합니다.
+### 핵심 기능
 
-### 🔥 핵심 기술적 특징
+- **반응형 API Gateway**: Spring WebFlux 기반 비동기/논블로킹 요청 처리
+- **중앙집중식 보안**: JWT 토큰 검증 및 사용자 정보 헤더 변환
+- **동적 서비스 라우팅**: Eureka 기반 서비스 디스커버리와 로드 밸런싱
+- **보안 헤더 관리**: 클라이언트 헤더 조작 방지 및 신뢰할 수 있는 헤더 주입
+- **CORS 정책 관리**: 통합 CORS 설정 및 보안 정책 적용
 
-- **🚀 반응형 아키텍처**: Spring WebFlux 기반 비동기/논블로킹 처리
-- **🛡️ 중앙집중식 보안**: JWT 토큰 검증 및 헤더 변환
-- **⚡ 동적 라우팅**: Eureka 기반 서비스 디스커버리 연동
-- **🔒 보안 강화**: 클라이언트 헤더 조작 방지 및 토큰 검증
-- **📊 실시간 모니터링**: Spring Boot Actuator 통합
+### 기술 스택
 
-## 🏗️ 시스템 아키텍처
+[![Spring Boot](https://img.shields.io/badge/Framework-Spring%20Boot%203.5.0-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![Spring Cloud Gateway](https://img.shields.io/badge/Gateway-Spring%20Cloud%20Gateway-blue.svg)](https://spring.io/projects/spring-cloud-gateway)
+[![WebFlux](https://img.shields.io/badge/Reactive-Spring%20WebFlux%20(Reactor)-purple.svg)](https://docs.spring.io/spring-framework/docs/current/reference/html/web-reactive.html)
+[![Eureka](https://img.shields.io/badge/Service%20Discovery-Spring%20Cloud%20Netflix%20Eureka-green.svg)](https://spring.io/projects/spring-cloud-netflix)
+[![Spring Security](https://img.shields.io/badge/Security-Spring%20Security%206.x%20%2B%20JWT-red.svg)](https://spring.io/projects/spring-security)
 
-### API Gateway 중심 마이크로서비스 구조
+## 시스템 아키텍처
 
-본 Gateway Service는 **마이크로서비스 아키텍처의 핵심 허브**로서 다음과 같은 역할을 수행합니다:
+### 마이크로서비스 중심 구조
 
-- **단일 진입점**: 모든 클라이언트 요청의 중앙집중식 처리
-- **보안 게이트웨이**: JWT 인증 및 권한 검증
-- **라우팅 허브**: 동적 서비스 발견 및 로드 밸런싱
-- **CORS 관리**: 통합 CORS 정책 적용
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        BROWSER[Web Browser]
+        MOBILE[Mobile App]
+        API_CLIENT[API Client]
+    end
+    
+    subgraph "Gateway Layer"
+        GW[Gateway Service<br/>:8080<br/>Single Entry Point]
+    end
+    
+    subgraph "Service Discovery"
+        EUREKA[Eureka Server<br/>:8761<br/>Service Registry]
+    end
+    
+    subgraph "Microservices"
+        AUTH[Auth Service<br/>:8081]
+        CSDDD[CSDDD Service<br/>:8083]
+        SCOPE[Scope Service<br/>:8082]
+        DART[DART Service]
+    end
+    
+    subgraph "Infrastructure"
+        CONFIG[Config Service<br/>:8888]
+        DB[(MySQL Database)]
+    end
+    
+    BROWSER --> GW
+    MOBILE --> GW
+    API_CLIENT --> GW
+    
+    GW --> EUREKA
+    EUREKA --> AUTH
+    EUREKA --> CSDDD
+    EUREKA --> SCOPE
+    EUREKA --> DART
+    
+    GW -.-> AUTH
+    GW -.-> CSDDD
+    GW -.-> SCOPE
+    GW -.-> DART
+    
+    CONFIG --> EUREKA
+    CONFIG --> GW
+    
+    AUTH --> DB
+    CSDDD --> DB
+    SCOPE --> DB
+    
+    style GW fill:#e1f5fe
+    style EUREKA fill:#f3e5f5
+```
 
-### JWT 인증 및 요청 처리 플로우
+### Gateway 내부 아키텍처
 
-JWT 토큰 기반의 **보안 중심 설계**로 다음과 같은 프로세스를 구현했습니다:
+```mermaid
+graph LR
+    subgraph "Gateway Service Architecture"
+        REQUEST[Incoming Request] --> CORS[CORS Filter]
+        CORS --> JWT_FILTER[JWT Authentication Filter]
+        JWT_FILTER --> ROUTE[Route Predicates]
+        ROUTE --> LB[Load Balancer]
+        LB --> TARGET[Target Service]
+        
+        subgraph "Security Components"
+            JWT_UTIL[JWT Util<br/>Token Validation]
+            CLAIMS[JWT Claims<br/>User Info]
+            HEADERS[Header Transformation]
+        end
+        
+        JWT_FILTER --> JWT_UTIL
+        JWT_UTIL --> CLAIMS
+        CLAIMS --> HEADERS
+        HEADERS --> LB
+    end
+```
 
-1. **토큰 추출**: HttpOnly 쿠키에서 JWT 토큰 안전 추출
-2. **토큰 검증**: 서명, 만료시간, 구조 검증
-3. **헤더 변환**: JWT Claims를 마이크로서비스용 헤더로 변환
-4. **보안 강화**: 클라이언트 헤더 조작 방지
-5. **라우팅**: 검증된 요청을 적절한 서비스로 전달
+## JWT 인증 및 라우팅 플로우
 
-## 🛠️ 기술 스택
+### 인증된 요청 처리 시퀀스
 
-### 핵심 프레임워크
+```mermaid
+sequenceDiagram
+    participant Client as Frontend Client
+    participant GW as Gateway Service
+    participant JWT as JWT Util
+    participant EUREKA as Eureka Server
+    participant SERVICE as Target Service
 
-- **Spring Boot 3.5.0** - 최신 Spring 생태계
-- **Spring Cloud Gateway** - 반응형 API Gateway
-- **Spring Cloud Netflix Eureka** - 서비스 디스커버리 클라이언트
-- **Spring WebFlux** - 비동기/논블로킹 웹 프레임워크
+    Client->>GW: HTTP Request + JWT Cookie
+    Note over Client,GW: Cookie: jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+    
+    GW->>GW: Extract JWT from Cookie
+    GW->>JWT: Validate Token
+    
+    alt Token Valid
+        JWT-->>GW: Token Valid
+        GW->>JWT: Extract Claims
+        JWT-->>GW: JWT Claims (userType, accountNumber, etc.)
+        
+        GW->>GW: Remove Client Headers
+        Note over GW: 보안: 클라이언트 헤더 조작 방지
+        
+        GW->>GW: Add Trusted Headers
+        Note over GW: X-USER-TYPE, X-HEADQUARTERS-ID, etc.
+        
+        GW->>EUREKA: Resolve Service Instance
+        EUREKA-->>GW: Service Location
+        
+        GW->>SERVICE: Forward Request with Headers
+        SERVICE-->>GW: Service Response
+        GW-->>Client: Final Response
+        
+    else Token Invalid
+        JWT-->>GW: Token Invalid
+        GW-->>Client: 401 Unauthorized
+    end
+```
 
-### 보안 & 인증
+### 공개 API 처리 시퀀스
 
-- **JJWT 0.11.5** - JWT 토큰 처리
-- **Custom Filter Chain** - 보안 필터 구현
-- **HttpOnly Cookie** - XSS 방지 토큰 저장
+```mermaid
+sequenceDiagram
+    participant Client as Frontend Client
+    participant GW as Gateway Service
+    participant EUREKA as Eureka Server
+    participant SERVICE as Target Service
 
-### 모니터링 & 운영
+    Client->>GW: HTTP Request (Public API)
+    Note over Client,GW: Path: /api/v1/auth/headquarters/login
+    
+    GW->>GW: Check Excluded Paths
+    Note over GW: 공개 API 화이트리스트 확인
+    
+    alt Public API
+        GW->>EUREKA: Resolve Service Instance
+        EUREKA-->>GW: Service Location
+        
+        GW->>SERVICE: Forward Request (No JWT Check)
+        SERVICE-->>GW: Service Response
+        GW-->>Client: Final Response
+        
+    else Protected API
+        GW->>GW: Require JWT Authentication
+        Note over GW: JWT 검증 프로세스 진행
+    end
+```
 
-- **Spring Boot Actuator** - 애플리케이션 메트릭
-- **Eureka Health Check** - 서비스 상태 모니터링
-- **Logback** - 구조화된 로깅
+## 보안 설계
 
-## ⚡ 주요 기능
+### JWT 토큰 처리 아키텍처
 
-### 1. **고성능 라우팅 시스템**
+```mermaid
+graph TD
+    subgraph "JWT Security Flow"
+        COOKIE[HttpOnly Cookie<br/>jwt=token] --> EXTRACT[Extract JWT]
+        EXTRACT --> VALIDATE[Validate Token]
+        
+        subgraph "Token Validation"
+            SIG[Signature Verification<br/>HMAC SHA-256]
+            EXP[Expiration Check<br/>15 minutes]
+            FORMAT[Format Validation<br/>JWT Standard]
+        end
+        
+        VALIDATE --> SIG
+        VALIDATE --> EXP
+        VALIDATE --> FORMAT
+        
+        SIG --> CLAIMS[Extract Claims]
+        EXP --> CLAIMS
+        FORMAT --> CLAIMS
+        
+        CLAIMS --> TRANSFORM[Transform to Headers]
+        
+        subgraph "Header Transformation"
+            REMOVE[Remove Client Headers<br/>보안: 조작 방지]
+            ADD[Add Trusted Headers<br/>X-USER-TYPE, X-ACCOUNT-NUMBER]
+        end
+        
+        TRANSFORM --> REMOVE
+        REMOVE --> ADD
+        ADD --> FORWARD[Forward to Service]
+    end
+    
+    style COOKIE fill:#ffebee
+    style VALIDATE fill:#f3e5f5
+    style TRANSFORM fill:#e8f5e8
+```
+
+### 보안 헤더 매핑
+
+| JWT Claims | 변환된 헤더 | 설명 | 예시 |
+|------------|-------------|------|------|
+| `accountNumber` | `X-ACCOUNT-NUMBER` | 계정 번호 | 2412161700-L1-001 |
+| `userType` | `X-USER-TYPE` | 사용자 타입 | HEADQUARTERS, PARTNER |
+| `companyName` | `X-COMPANY-NAME` | 회사명 | 삼성전자 |
+| `headquartersId` | `X-HEADQUARTERS-ID` | 본사 ID | 1 |
+| `partnerId` | `X-PARTNER-ID` | 협력사 ID | 101 |
+| `treePath` | `X-TREE-PATH` | 계층 경로 | /1/L1-001/ |
+| `level` | `X-LEVEL` | 협력사 레벨 | 1, 2, 3 |
+
+### 보안 특징
+
+- **클라이언트 헤더 조작 방지**: 모든 사용자 관련 헤더 제거 후 신뢰할 수 있는 헤더로 재설정
+- **HttpOnly Cookie**: XSS 공격 방지를 위한 쿠키 기반 JWT 저장
+- **토큰 검증**: 서명, 만료시간, 형식의 3단계 검증
+- **공개 API 화이트리스트**: 로그인/회원가입 등 JWT 검증 제외 경로 관리
+
+## 라우팅 설정
+
+### 동적 서비스 라우팅
 
 ```yaml
 spring:
   cloud:
     gateway:
       routes:
+        # Auth Service 라우팅
         - id: auth-service
           uri: lb://auth-service
           predicates:
-            - Path=/api/v1/headquarters/**, /api/v1/partners/**
+            - Path=/api/v1/auth/**
+          filters:
+            - name: JwtAuthenticationGatewayFilter
+              args:
+                excludePaths: "/api/v1/auth/headquarters/login,/api/v1/auth/headquarters/register,/api/v1/auth/partners/login"
+        
+        # CSDDD Service 라우팅
+        - id: csddd-service
+          uri: lb://csddd-service
+          predicates:
+            - Path=/api/v1/csddd/**
+          filters:
+            - name: JwtAuthenticationGatewayFilter
+        
+        # Scope Service 라우팅
+        - id: scope-service
+          uri: lb://scope-service
+          predicates:
+            - Path=/api/v1/scope/**
           filters:
             - name: JwtAuthenticationGatewayFilter
 ```
 
-### 2. **커스텀 JWT 인증 필터**
-
-**JwtAuthenticationGatewayFilterFactory** 클래스를 직접 구현하여 다음 기능을 제공:
+### CORS 설정
 
 ```java
-@Component
-public class JwtAuthenticationGatewayFilterFactory
-    extends AbstractGatewayFilterFactory<Config> {
-
-    // 핵심 기능:
-    // 1. 쿠키에서 JWT 추출
-    // 2. 토큰 검증 (서명, 만료시간)
-    // 3. Claims 디코딩 및 헤더 변환
-    // 4. 클라이언트 헤더 조작 방지
-    // 5. 공개 API 자동 필터링
+@Configuration
+public class CorsGlobalConfiguration {
+    @Bean
+    public CorsWebFilter corsWebFilter() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowCredentials(true);
+        config.setAllowedOriginPatterns(List.of("http://localhost:3000"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        
+        return new CorsWebFilter(source);
+    }
 }
 ```
 
-### 3. **보안 헤더 변환**
+## 성능 및 모니터링
 
-JWT Claims를 마이크로서비스에서 활용 가능한 HTTP 헤더로 변환:
+### 반응형 프로그래밍 이점
 
-| JWT Claims       | 변환된 헤더         | 설명                               |
-| ---------------- | ------------------- | ---------------------------------- |
-| `accountNumber`  | `X-Account-Number`  | 계정 번호 (2412161700-L1-001)      |
-| `userType`       | `X-User-Type`       | 사용자 타입 (HEADQUARTERS/PARTNER) |
-| `companyName`    | `X-Company-Name`    | 회사명 (삼성전자)                  |
-| `treePath`       | `X-Tree-Path`       | 계층 구조 경로 (/1/L1-001/)        |
-| `userId`         | `X-User-Id`         | 사용자 고유 ID                     |
-| `headquartersId` | `X-Headquarters-Id` | 본사 ID                            |
-| `level`          | `X-Level`           | 협력사 레벨 (1, 2, 3...)           |
+- **높은 동시성**: 적은 스레드로 수천 개의 동시 연결 처리
+- **논블로킹 I/O**: 이벤트 기반 비동기 요청 처리로 높은 처리량
+- **백프레셔 지원**: 부하 제어를 통한 시스템 안정성
+- **메모리 효율성**: 적은 메모리로 더 많은 요청 처리
 
-### 4. **동적 서비스 발견**
+### Actuator 모니터링 엔드포인트
 
-- **Eureka Client**: 마이크로서비스 자동 발견
-- **Load Balancing**: Netflix Ribbon 통합
-- **Health Check**: 실시간 서비스 상태 모니터링
-- **Failover**: 서비스 장애 시 자동 라우팅
-
-## 🔒 보안 설계
-
-### 다층 보안 아키텍처
-
-#### 1. **클라이언트 헤더 조작 방지**
-
-```java
-// 모든 사용자 관련 헤더를 제거하여 조작 방지
-ServerHttpRequest modifiedRequest = request.mutate()
-    .headers(headers -> {
-        headers.remove("X-User-Id");
-        headers.remove("X-User-Type");
-        headers.remove("X-Headquarters-Id");
-        // ... 모든 인증 관련 헤더 제거
-    })
-    // Gateway에서만 신뢰할 수 있는 헤더 추가
-    .header("X-User-Id", String.valueOf(claims.getUserId()))
-    .header("X-User-Type", claims.getUserType())
-    // ...
-    .build();
-```
-
-#### 2. **JWT 토큰 3단계 검증**
-
-- **서명 검증**: HMAC SHA-256 알고리즘
-- **만료 시간 검증**: 토큰 유효기간 확인
-- **구조 검증**: JWT 표준 형식 준수 확인
-
-#### 3. **공개 API 화이트리스트**
-
-```java
-// 인증이 필요 없는 API 경로 설정
-private boolean isExcludedPath(String path, String excludePaths) {
-    // 로그인, 회원가입 등 JWT 검증 제외
-    List<String> excludeList = Arrays.asList(excludePaths.split(","));
-    return excludeList.stream().anyMatch(path::startsWith);
-}
-```
-
-### 토큰 보안 정책
-
-- **저장 방식**: HttpOnly Cookie (XSS 공격 방지)
-- **전송 보안**: Secure, SameSite=Strict 설정
-- **만료 관리**: Access Token 15분, Refresh Token 7일
-- **암호화**: 쿠키 값 자체가 JWT (별도 암호화 불필요)
-
-## 📊 모니터링 & 운영
-
-### Spring Boot Actuator 통합
-
-| 엔드포인트                 | 기능        | 활용 방안                 |
-| -------------------------- | ----------- | ------------------------- |
-| `/actuator/health`         | 헬스 체크   | 로드밸런서 상태 확인      |
+| 엔드포인트 | 기능 | 활용 방안 |
+|------------|------|----------|
+| `/actuator/health` | 헬스 체크 | 로드밸런서 상태 확인 |
 | `/actuator/gateway/routes` | 라우팅 정보 | 등록된 라우트 실시간 조회 |
-| `/actuator/metrics`        | 성능 메트릭 | 처리량, 응답시간 모니터링 |
-| `/actuator/info`           | 서비스 정보 | 버전, 빌드 정보 추적      |
+| `/actuator/metrics` | 성능 메트릭 | 처리량, 응답시간 모니터링 |
+| `/actuator/gateway/filters` | 필터 정보 | 적용된 필터 체인 확인 |
 
-### 로깅 전략
+## API 문서
 
-```yaml
-logging:
-  level:
-    org.springframework.cloud.gateway: DEBUG # Gateway 라우팅 로그
-    com.nsmm.esg.gateway_service: DEBUG # 커스텀 필터 로그
-    org.springframework.security: WARN # 보안 관련 경고
-  pattern:
-    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
-```
+### 주요 라우팅 엔드포인트
 
-## 🚀 성능 최적화
+#### 인증 서비스 라우팅
 
-### 반응형 프로그래밍 활용
+| Original Path | Target Service | 설명 | JWT 검증 |
+|---------------|----------------|------|----------|
+| `/api/v1/auth/headquarters/login` | auth-service | 본사 로그인 | 제외 |
+| `/api/v1/auth/headquarters/register` | auth-service | 본사 회원가입 | 제외 |
+| `/api/v1/auth/headquarters/me` | auth-service | 현재 사용자 정보 | 필요 |
+| `/api/v1/auth/partners/**` | auth-service | 협력사 관리 API | 일부 제외 |
 
-**Spring WebFlux** 기반으로 다음과 같은 성능 이점을 구현:
+#### 비즈니스 서비스 라우팅
 
-- **Non-blocking I/O**: 높은 동시성 처리 (수천 개 동시 연결)
-- **Event-driven**: 이벤트 기반 비동기 요청 처리
-- **Backpressure**: 부하 제어를 통한 시스템 안정성
-- **Resource Efficiency**: 적은 메모리로 더 많은 요청 처리
+| Original Path | Target Service | 설명 | JWT 검증 |
+|---------------|----------------|------|----------|
+| `/api/v1/csddd/**` | csddd-service | CSDDD 자가진단 API | 필요 |
+| `/api/v1/scope/**` | scope-service | 탄소배출량 관리 API | 필요 |
+| `/api/v1/dart/**` | dart-service | DART API 통합 | 필요 |
 
-### 캐싱 전략
+## 실행 방법
 
-- **Eureka 서비스 캐시**: 30초 주기 서비스 목록 갱신
-- **Route 캐시**: 메모리 기반 라우팅 규칙 캐싱
-- **JWT 검증 캐시**: 동일 토큰 중복 검증 방지
-
-## 🔧 로컬 개발 환경
-
-### 실행 순서 (의존성 고려)
+### 개발 환경 구성
 
 ```bash
 # 1. 서비스 디스커버리 먼저 실행
-cd backend/discovery-service && ./gradlew bootRun
+cd backend/discovery-service
+./gradlew bootRun
 
 # 2. 설정 서버 실행 (선택사항)
-cd backend/config-service && ./gradlew bootRun
+cd backend/config-service
+./gradlew bootRun
 
 # 3. 인증 서비스 실행
-cd backend/auth-service && ./gradlew bootRun
+cd backend/auth-service
+./gradlew bootRun
 
 # 4. Gateway 서비스 실행 (마지막)
-cd backend/gateway-service && ./gradlew bootRun
+cd backend/gateway-service
+./gradlew bootRun
+```
+
+### 환경 변수 설정
+
+```yaml
+# application.yml
+spring:
+  application:
+    name: gateway-service
+  config:
+    import: optional:configserver:http://localhost:8888
+
+server:
+  port: 8080
+
+# JWT 설정 (Auth Service와 동일해야 함)
+jwt:
+  secret: ${JWT_SECRET:your-256-bit-secret-key}
+
+# Eureka 설정
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
 ```
 
 ### 필수 환경 변수
@@ -230,72 +386,113 @@ export JWT_SECRET="your-256-bit-secret-key"
 # Eureka 서버 주소
 export EUREKA_SERVER_URL="http://localhost:8761/eureka"
 
-# 선택적 설정
-export CORS_ALLOWED_ORIGINS="http://localhost:3000,http://localhost:8080"
+# CORS 허용 오리진
+export CORS_ALLOWED_ORIGINS="http://localhost:3000"
 ```
 
-### 서비스 상태 확인
+## 테스트
 
 ```bash
-# Gateway 서비스 상태
+# 단위 테스트 실행
+./gradlew test
+
+# 통합 테스트 실행
+./gradlew integrationTest
+
+# Gateway 상태 확인
 curl http://localhost:8080/actuator/health
 
 # 등록된 라우트 확인
 curl http://localhost:8080/actuator/gateway/routes | jq .
-
-# Eureka 대시보드에서 서비스 등록 확인
-open http://localhost:8761
 ```
 
-## 📈 확장성 고려사항
+## 핵심 구현 특징
 
-### 수평 확장 (Horizontal Scaling)
+### 1. 커스텀 JWT 필터 구현
 
-```yaml
-# 다중 Gateway 인스턴스 실행 지원
-server:
-  port: ${PORT:8080} # 환경 변수로 동적 포트 할당
-
-eureka:
-  instance:
-    instance-id: ${spring.application.name}:${spring.cloud.client.hostname}:${random.int}
-    prefer-ip-address: true
+```java
+@Component
+public class JwtAuthenticationGatewayFilterFactory 
+    extends AbstractGatewayFilterFactory<Config> {
+    
+    @Override
+    public GatewayFilter apply(Config config) {
+        return (exchange, chain) -> {
+            // 1. JWT 쿠키 추출
+            String jwt = extractJwtFromCookie(request);
+            
+            // 2. 토큰 검증
+            if (jwtUtil.validateToken(jwt)) {
+                // 3. Claims 추출
+                JwtClaims claims = jwtUtil.getAllClaimsFromToken(jwt);
+                
+                // 4. 헤더 변환 (보안 강화)
+                ServerHttpRequest modifiedRequest = request.mutate()
+                    .headers(headers -> removeClientHeaders(headers))
+                    .header("X-USER-TYPE", claims.getUserType())
+                    .header("X-ACCOUNT-NUMBER", claims.getAccountNumber())
+                    .build();
+                
+                return chain.filter(exchange.mutate().request(modifiedRequest).build());
+            }
+            
+            return handleUnauthorized(exchange);
+        };
+    }
+}
 ```
 
-### 향후 확장 계획
+### 2. 반응형 아키텍처 활용
 
-1. **Rate Limiting**: Redis 기반 속도 제한 구현
-2. **Circuit Breaker**: Resilience4j 통합으로 장애 격리
-3. **API 버저닝**: 경로 기반 버전 관리 시스템
-4. **분산 캐싱**: Redis Cluster 기반 캐시 레이어
-5. **메트릭 수집**: Prometheus + Grafana 연동
+- **WebFlux 기반**: 논블로킹 I/O로 높은 동시성 처리
+- **Reactor 패턴**: 이벤트 기반 비동기 요청 처리
+- **백프레셔**: 시스템 과부하 방지를 위한 흐름 제어
 
-## 🎯 구현 하이라이트
+### 3. 보안 중심 설계
 
-### 아키텍처 설계 역량
+- **헤더 조작 방지**: 클라이언트에서 전송된 모든 인증 헤더 제거 후 Gateway에서 신뢰할 수 있는 헤더 추가
+- **공개 API 관리**: 화이트리스트 기반 JWT 검증 제외 경로 관리
+- **토큰 보안**: HttpOnly 쿠키 기반 JWT 저장으로 XSS 공격 방지
 
-- **마이크로서비스 패턴**: Single Entry Point 구현
-- **API Gateway 패턴**: 중앙집중식 요청 관리
-- **보안 아키텍처**: 다층 보안 시스템 설계
+### 4. 동적 서비스 디스커버리
 
-### 기술적 전문성
+```java
+// Eureka 기반 동적 라우팅
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: auth-service
+          uri: lb://auth-service  # 로드 밸런싱 지원
+```
 
-- **Spring Cloud Gateway**: 커스텀 필터 팩토리 구현
-- **반응형 프로그래밍**: WebFlux 기반 고성능 처리
-- **JWT 보안**: 토큰 기반 무상태 인증 시스템
+## 성능 최적화
 
-### 운영 고려사항
+### 캐싱 전략
 
+- **Eureka 서비스 캐시**: 30초 주기 서비스 목록 갱신
+- **Route 캐시**: 메모리 기반 라우팅 규칙 캐싱
+- **JWT 검증 최적화**: 동일 토큰 중복 검증 방지
+
+### 메모리 및 스레드 최적화
+
+- **Event Loop**: 적은 수의 스레드로 많은 연결 처리
+- **Connection Pool**: HTTP 클라이언트 연결 풀 최적화
+- **GC 튜닝**: 반응형 처리에 최적화된 가비지 컬렉션 설정
+
+## 주요 특징
+
+- **확장성**: 수평 확장 가능한 Stateless 아키텍처
+- **보안성**: 다층 보안 설계와 중앙집중식 인증
+- **성능**: 반응형 프로그래밍으로 높은 처리량
 - **모니터링**: Actuator 기반 실시간 상태 추적
-- **로깅**: 구조화된 로그 및 디버깅 지원
-- **확장성**: 수평 확장 가능한 아키텍처
-
-## 🔗 관련 서비스
-
-- **[Auth Service](../auth-service/README.md)**: JWT 토큰 발급 및 사용자 인증
-- **[Discovery Service](../discovery-service/README.md)**: 서비스 등록 및 발견
-- **[Config Service](../config-service/README.md)**: 중앙집중식 설정 관리
+- **유연성**: 동적 라우팅과 서비스 디스커버리
 
 ---
 
-_ESG 프로젝트의 핵심 진입점으로서 안정적이고 확장 가능한 API Gateway를 구현했습니다. 엔터프라이즈급 보안과 성능을 동시에 달성한 아키텍처입니다._
+**기술적 성과**:
+- Spring Cloud Gateway 기반 엔터프라이즈급 API Gateway 구현
+- 반응형 프로그래밍을 활용한 고성능 비동기 처리 시스템 설계
+- JWT 기반 중앙집중식 보안 아키텍처와 헤더 조작 방지 시스템 구현
+- Eureka 기반 동적 서비스 디스커버리와 로드 밸런싱 구현
+
